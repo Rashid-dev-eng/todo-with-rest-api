@@ -1,0 +1,567 @@
+const token = localStorage.getItem("token");
+
+const todoList = document.getElementById("todoList");
+const todoForm = document.getElementById("todoForm");
+const message = document.getElementById("message");
+const logoutBtn = document.getElementById("logoutBtn");
+
+
+// ===============================
+// PROTECT DASHBOARD
+// ===============================
+
+if (!token) {
+
+    window.location.href = "index.html";
+
+}
+
+
+// ===============================
+// GET ALL TODOS
+// ===============================
+
+async function getTodos() {
+
+    try {
+
+        const response = await fetch(
+            "http://127.0.0.1:8000/api/todos/",
+            {
+                method: "GET",
+
+                headers: {
+                    "Authorization": `Token ${token}`,
+                    "Content-Type": "application/json"
+                }
+            }
+        );
+
+
+        // Token is invalid
+        if (response.status === 401) {
+
+            localStorage.removeItem("token");
+
+            window.location.href = "index.html";
+
+            return;
+        }
+
+
+        const data = await response.json();
+
+        console.log(data);
+
+
+        // No todos
+        if (data.length === 0) {
+
+            todoList.innerHTML = `
+                <div class="todo-item">
+                    <p>You don't have any todos yet.</p>
+                </div>
+            `;
+
+            return;
+        }
+
+
+        // Clear previous todos
+        todoList.innerHTML = "";
+
+
+        // Display todos
+        data.forEach(todo => {
+
+            const todoElement = document.createElement("div");
+
+            todoElement.classList.add("todo-item");
+
+
+            const statusClass =
+                todo.completed
+                    ? "completed"
+                    : "not-completed";
+
+
+            const statusText =
+                todo.completed
+                    ? "Completed"
+                    : "Not completed";
+
+
+            const toggleText =
+                todo.completed
+                    ? "Mark as incomplete"
+                    : "Mark as completed";
+
+
+            todoElement.innerHTML = `
+
+                <h3>
+                    ${todo.title}
+                </h3>
+
+
+                <p class="todo-description">
+                    ${todo.description}
+                </p>
+
+
+                <p class="todo-status ${statusClass}">
+
+                    Status:
+                    ${statusText}
+
+                </p>
+
+
+                <div class="todo-actions">
+
+                    <button
+                        class="toggle-btn"
+                        data-id="${todo.id}"
+                        data-completed="${todo.completed}"
+                    >
+                        ${toggleText}
+                    </button>
+
+
+                    <button
+                        class="edit-btn"
+                        data-id="${todo.id}"
+                    >
+                        Edit
+                    </button>
+
+
+                    <button
+                        class="delete-btn"
+                        data-id="${todo.id}"
+                    >
+                        Delete
+                    </button>
+
+                </div>
+
+            `;
+
+
+            todoList.appendChild(todoElement);
+
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        todoList.innerHTML = `
+            <div class="todo-item">
+                <p>Unable to connect to the server.</p>
+            </div>
+        `;
+
+    }
+
+}
+
+
+// ===============================
+// CREATE TODO
+// ===============================
+
+todoForm.addEventListener(
+    "submit",
+    async function(event) {
+
+        event.preventDefault();
+
+
+        const title =
+            document.getElementById("title").value;
+
+        const description =
+            document.getElementById("description").value;
+
+
+        try {
+
+            const response = await fetch(
+                "http://127.0.0.1:8000/api/todos/",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Authorization": `Token ${token}`,
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        title: title,
+                        description: description,
+                        completed: false
+                    })
+                }
+            );
+
+
+            const data = await response.json();
+
+
+            if (response.ok) {
+
+                message.textContent =
+                    "Todo created successfully.";
+
+                todoForm.reset();
+
+                getTodos();
+
+            } else {
+
+                console.log(data);
+
+                message.textContent =
+                    "Failed to create Todo.";
+
+            }
+
+        } catch (error) {
+
+            console.error(error);
+
+            message.textContent =
+                "Unable to connect to the server.";
+
+        }
+
+    }
+);
+
+
+// ===============================
+// TOGGLE TODO
+// ===============================
+
+async function toggleTodo(todoId, completed) {
+
+    try {
+
+        const response = await fetch(
+            `http://127.0.0.1:8000/api/todo/${todoId}/`,
+            {
+                method: "PATCH",
+
+                headers: {
+                    "Authorization": `Token ${token}`,
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    completed: !completed
+                })
+            }
+        );
+
+
+        if (response.ok) {
+
+            getTodos();
+
+        } else {
+
+            const data = await response.json();
+
+            console.log(data);
+
+        }
+
+    } catch (error) {
+
+        console.error(error);
+
+    }
+
+}
+
+
+// ===============================
+// EDIT TODO
+// ===============================
+
+async function editTodo(todoId) {
+
+    const title =
+        prompt("Enter the new title:");
+
+
+    if (title === null) {
+
+        return;
+
+    }
+
+
+    const description =
+        prompt("Enter the new description:");
+
+
+    if (description === null) {
+
+        return;
+
+    }
+
+
+    try {
+
+        const response = await fetch(
+            `http://127.0.0.1:8000/api/todo/${todoId}/`,
+            {
+                method: "PATCH",
+
+                headers: {
+                    "Authorization": `Token ${token}`,
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    title: title,
+                    description: description
+                })
+            }
+        );
+
+
+        const data = await response.json();
+
+
+        if (response.ok) {
+
+            message.textContent =
+                "Todo updated successfully.";
+
+            getTodos();
+
+        } else {
+
+            console.log(data);
+
+            message.textContent =
+                "Failed to update Todo.";
+
+        }
+
+    } catch (error) {
+
+        console.error(error);
+
+        message.textContent =
+            "Unable to connect to the server.";
+
+    }
+
+}
+
+
+// ===============================
+// DELETE TODO
+// ===============================
+
+async function deleteTodo(todoId) {
+
+    const confirmed =
+        confirm(
+            "Are you sure you want to delete this Todo?"
+        );
+
+
+    if (!confirmed) {
+
+        return;
+
+    }
+
+
+    try {
+
+        const response = await fetch(
+            `http://127.0.0.1:8000/api/todo/${todoId}/`,
+            {
+                method: "DELETE",
+
+                headers: {
+                    "Authorization": `Token ${token}`
+                }
+            }
+        );
+
+
+        if (response.ok) {
+
+            message.textContent =
+                "Todo deleted successfully.";
+
+            getTodos();
+
+        } else {
+
+            const data = await response.json();
+
+            console.log(data);
+
+            message.textContent =
+                "Failed to delete Todo.";
+
+        }
+
+    } catch (error) {
+
+        console.error(error);
+
+        message.textContent =
+            "Unable to connect to the server.";
+
+    }
+
+}
+
+
+// ===============================
+// LOGOUT
+// ===============================
+
+logoutBtn.addEventListener(
+    "click",
+    async function() {
+
+        const confirmed =
+            confirm(
+                "Are you sure you want to logout?"
+            );
+
+
+        if (!confirmed) {
+
+            return;
+
+        }
+
+
+        try {
+
+            const response = await fetch(
+                "http://127.0.0.1:8000/api/logout/",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Authorization": `Token ${token}`,
+                        "Content-Type": "application/json"
+                    }
+                }
+            );
+
+
+            if (response.ok) {
+
+                localStorage.removeItem("token");
+
+                window.location.href =
+                    "index.html";
+
+            } else {
+
+                console.log("Logout failed.");
+
+                message.textContent =
+                    "Logout failed.";
+
+            }
+
+        } catch (error) {
+
+            console.error(error);
+
+            message.textContent =
+                "Unable to connect to the server.";
+
+        }
+
+    }
+);
+
+
+// ===============================
+// HANDLE TODO BUTTONS
+// ===============================
+
+todoList.addEventListener(
+    "click",
+    function(event) {
+
+
+        // Toggle button
+        if (
+            event.target.classList.contains(
+                "toggle-btn"
+            )
+        ) {
+
+            const todoId =
+                event.target.dataset.id;
+
+
+            const completed =
+                event.target.dataset.completed === "true";
+
+
+            toggleTodo(
+                todoId,
+                completed
+            );
+
+        }
+
+
+        // Edit button
+        if (
+            event.target.classList.contains(
+                "edit-btn"
+            )
+        ) {
+
+            const todoId =
+                event.target.dataset.id;
+
+
+            editTodo(todoId);
+
+        }
+
+
+        // Delete button
+        if (
+            event.target.classList.contains(
+                "delete-btn"
+            )
+        ) {
+
+            const todoId =
+                event.target.dataset.id;
+
+
+            deleteTodo(todoId);
+
+        }
+
+    }
+);
+
+
+// ===============================
+// LOAD TODOS
+// ===============================
+
+getTodos();
